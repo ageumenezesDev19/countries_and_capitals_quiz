@@ -5,7 +5,8 @@
         <x-question
             :country="$country"
             :currentQuestion="$currentQuestion"
-            :totalQuestions="$totalQuestions" />
+            :totalQuestions="$totalQuestions"
+        />
 
         <div class="row">
         @foreach ($answers as $answer)

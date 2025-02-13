@@ -105,7 +105,7 @@ class MainController extends Controller
         }
 
         $quiz = session('quiz');
-        $current_question = session('current_question') - 1;
+        $current_question = session('current_question');
         $correct_answer = $quiz[$current_question]['correct_answer'];
         $correct_answers = session('correct_answers');
         $wrong_answers = session('wrong_answers');
@@ -131,5 +131,7 @@ class MainController extends Controller
             'currentQuestion' => $current_question,
             'totalQuestions' => session('total_questions'),
         ];
+
+        return view('answer_result')->with($data);
     }
 }
