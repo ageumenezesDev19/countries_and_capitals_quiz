@@ -7,7 +7,7 @@ use Illuminate\View\View;
 
 class MainController extends Controller
 {
-    private $app_data;
+    private array $app_data;
 
     public function __construct()
     {
@@ -20,57 +20,53 @@ class MainController extends Controller
     }
 
     public function prepareGame(Request $request)
-    {
-        $request->validate([
-            'total_questions' => 'required|integer|min:3|max:30',
-        ],
-        [
-            'total_questions.required' => 'Please enter the total number of questions.',
-            'total_questions.integer' => 'The total number of questions must be an integer.',
-            'total_questions.min' => 'The total number of questions must be at least 3.',
-            'total_questions.max' => 'The total number of questions must not be greater than 30.',
-        ]
-    );
+{
+    $request->validate([
+        'total_questions' => 'required|integer|min:3|max:30',
+    ], [
+        'total_questions.required' => 'Please enter the total number of questions.',
+        'total_questions.integer' => 'The total number of questions must be an integer.',
+        'total_questions.min' => 'The total number of questions must be at least 3.',
+        'total_questions.max' => 'The total number of questions must not be greater than 30.',
+    ]);
 
-        $total_questions = intval($request->input('total_questions'));
+    session()->forget(['quiz', 'total_questions', 'current_question', 'correct_answers', 'wrong_answers']); // Zera a sessão antes de iniciar
 
-        $quiz = $this->prepareQuiz($total_questions);
+    $total_questions = intval($request->input('total_questions'));
+    $quiz = $this->prepareQuiz($total_questions);
 
-        session()->put([
-            'quiz' => $quiz,
-            'total_questions' => $total_questions,
-            'current_question' => 1,
-            'correct_answers' => 0,
-            'wrong_answers' => 0,
-        ]);
+    session()->put([
+        'quiz' => $quiz,
+        'total_questions' => $total_questions,
+        'current_question' => 0, // Começa corretamente do zero
+        'correct_answers' => 0,
+        'wrong_answers' => 0,
+    ]);
 
-        return redirect()->route('game');
-    }
+    return redirect()->route('game');
+}
 
-    private function prepareQuiz($total_questions)
+    private function prepareQuiz(int $total_questions): array
     {
         $questions = [];
         $total_countries = count($this->app_data);
 
-        $indexes = range(0, $total_countries - 1);
-        shuffle($indexes);
-        $indexes = array_slice($indexes, 0, $total_questions);
+        if ($total_countries < $total_questions) {
+            abort(400, 'Not enough countries available.');
+        }
 
-        $question_number = 1;
-        foreach ($indexes as $index) {
-            $questions['question_number'] = $question_number;
+        $indexes = array_rand($this->app_data, $total_questions);
+
+        foreach ((array) $indexes as $index) {
+            $question = [];
             $question['country'] = $this->app_data[$index]['country'];
             $question['correct_answer'] = $this->app_data[$index]['capital'];
 
             $other_capitals = array_column($this->app_data, 'capital');
-
             $other_capitals = array_diff($other_capitals, [$question['correct_answer']]);
-
             shuffle($other_capitals);
+
             $question['wrong_answers'] = array_slice($other_capitals, 0, 3);
-
-            $question['correct'] = null;
-
             $questions[] = $question;
         }
 
@@ -79,19 +75,22 @@ class MainController extends Controller
 
     public function game(): View
     {
-        $quiz = session('quiz');
-        $total_questions = session('total_questions');
-        $current_question = session('current_questions') - 1;
+        $quiz = session('quiz', []);
+        $total_questions = session('total_questions', 0);
+        $current_question = session()->has('current_question') ? session('current_question') : 0;
+
+        if (!isset($quiz[$current_question])) {
+            return redirect()->route('startGame'); // Redireciona caso algo esteja errado
+        }
 
         $answers = $quiz[$current_question]['wrong_answers'];
         $answers[] = $quiz[$current_question]['correct_answer'];
-
         shuffle($answers);
 
-        return view('game')->with([
+        return view('game', [
             'country' => $quiz[$current_question]['country'],
-            'total_questions' => $total_questions,
-            'current_question' => $current_question,
+            'totalQuestions' => $total_questions,
+            'currentQuestion' => $current_question, // or $current_question + 1
             'answers' => $answers,
         ]);
     }
